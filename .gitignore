@@ -1,0 +1,7 @@
+.env
+.streamlit/secrets.toml
+data/profile.json
+data/log.csv
+__pycache__/
+*.pyc
+.venv/

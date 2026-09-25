@@ -60,6 +60,12 @@ def update_profile(updates: dict) -> dict:
     return get_profile()
 
 
+def get_log_for_date(entry_date: str) -> dict | None:
+    """Gets the existing log row for a date, if one exists."""
+    resp = _sb().table("logs").select("*").eq("entry_date", entry_date).execute()
+    return resp.data[0] if resp.data else None
+
+
 def log_entry(
     weight_kg: float | None = None,
     calories: float | None = None,
@@ -68,16 +74,31 @@ def log_entry(
     notes: str = "",
     entry_date: str | None = None,
 ) -> dict:
-    """Records a daily log entry (weight, calories, protein, workout, notes)."""
-    row = {
-        "entry_date": entry_date or date.today().isoformat(),
+    """Records or updates the day's log entry. Merges into any existing row for
+    that date rather than inserting a new one, so a second log the same day
+    (e.g. calories added in the evening after a morning weigh-in) updates the
+    day's entry instead of creating a duplicate row that would double-count in
+    trends or confuse 'what did I log today' questions."""
+    entry_date = entry_date or date.today().isoformat()
+    existing = get_log_for_date(entry_date)
+    row = existing or {"entry_date": entry_date}
+    row_id = row.pop("id", None)
+    row.pop("created_at", None)
+
+    for key, value in {
         "weight_kg": weight_kg,
         "calories": calories,
         "protein_g": protein_g,
         "workout": workout,
         "notes": notes,
-    }
-    _sb().table("logs").insert(row).execute()
+    }.items():
+        if value not in (None, ""):
+            row[key] = value
+
+    if row_id:
+        _sb().table("logs").update(row).eq("id", row_id).execute()
+    else:
+        _sb().table("logs").insert(row).execute()
     return row
 
 

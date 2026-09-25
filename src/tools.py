@@ -67,33 +67,44 @@ def get_log_for_date(entry_date: str) -> dict | None:
 
 
 def log_entry(
-    weight_kg: float | None = None,
-    calories: float | None = None,
-    protein_g: float | None = None,
+    weight_kg: int | float | None = None,
+    calories: int | float | None = None,
+    protein_g: int | float | None = None,
+    fat_g: int | float | None = None,
+    carbs_g: int | float | None = None,
     workout: str = "",
     notes: str = "",
     entry_date: str | None = None,
 ) -> dict:
-    """Records or updates the day's log entry. Merges into any existing row for
-    that date rather than inserting a new one, so a second log the same day
-    (e.g. calories added in the evening after a morning weigh-in) updates the
-    day's entry instead of creating a duplicate row that would double-count in
-    trends or confuse 'what did I log today' questions."""
+    """Records a meal or activity for the day. When the user describes food,
+    pass YOUR OWN estimate of that meal's calories/protein/fat/carbs based on
+    what they said they ate -- don't ask them to calculate it, and mention in
+    your reply that the numbers are estimates, not lab-measured values.
+
+    IMPORTANT: pass only THIS meal's/activity's numbers, never a running
+    total -- calories/protein/fat/carbs are automatically added to whatever
+    is already logged for the day, so logging breakfast then separately
+    logging lunch correctly accumulates both. Do not attempt to add up the
+    day's total yourself; call get_log_for_date to see the current running
+    total if you need it. weight_kg overwrites (you only weigh in once
+    meaningfully per day); workout/notes append as separate entries rather
+    than overwriting, so multiple activities/meals in a day all stay visible."""
     entry_date = entry_date or date.today().isoformat()
     existing = get_log_for_date(entry_date)
     row = existing or {"entry_date": entry_date}
     row_id = row.pop("id", None)
     row.pop("created_at", None)
 
-    for key, value in {
-        "weight_kg": weight_kg,
-        "calories": calories,
-        "protein_g": protein_g,
-        "workout": workout,
-        "notes": notes,
-    }.items():
-        if value not in (None, ""):
-            row[key] = value
+    if weight_kg is not None:
+        row["weight_kg"] = weight_kg
+
+    for key, value in {"calories": calories, "protein_g": protein_g, "fat_g": fat_g, "carbs_g": carbs_g}.items():
+        if value is not None:
+            row[key] = (row.get(key) or 0) + value
+
+    for key, value in {"workout": workout, "notes": notes}.items():
+        if value:
+            row[key] = f"{row[key]}; {value}" if row.get(key) else value
 
     if row_id:
         _sb().table("logs").update(row).eq("id", row_id).execute()

@@ -22,7 +22,7 @@ for _key in ("GEMINI_API_KEY", "SUPABASE_URL", "SUPABASE_KEY"):
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from agent import make_chat  # noqa: E402
-from tools import get_log_for_date, log_entry  # noqa: E402
+from tools import get_log_for_date, get_profile  # noqa: E402
 
 st.set_page_config(page_title="Health Assistant", page_icon="🧬")
 
@@ -66,37 +66,31 @@ if "chat" not in st.session_state:
 chat = st.session_state.chat
 
 with st.sidebar:
-    st.subheader("📋 Log a day")
-    log_date = st.date_input("Date", value=date.today(), key="log_date")
-    existing = get_log_for_date(log_date.isoformat())
+    st.subheader("📊 Today")
+    today = get_log_for_date(date.today().isoformat())
+    targets = get_profile().get("current_targets", {})
 
-    with st.form("log_form"):
-        weight = st.number_input(
-            "Weight (kg)", min_value=0.0, step=0.1,
-            value=float(existing["weight_kg"]) if existing and existing.get("weight_kg") else 0.0,
-        )
-        calories = st.number_input(
-            "Calories", min_value=0.0, step=10.0,
-            value=float(existing["calories"]) if existing and existing.get("calories") else 0.0,
-        )
-        protein = st.number_input(
-            "Protein (g)", min_value=0.0, step=1.0,
-            value=float(existing["protein_g"]) if existing and existing.get("protein_g") else 0.0,
-        )
-        workout = st.text_input("Workout", value=existing.get("workout", "") if existing else "")
-        notes = st.text_area("Notes", value=existing.get("notes", "") if existing else "")
+    if today:
+        def _metric(label, key, unit=""):
+            value = today.get(key)
+            if value is None:
+                return
+            target = targets.get(key)
+            delta = f"{value - target:+.0f} vs target" if isinstance(target, (int, float)) else None
+            st.metric(label, f"{value:.0f}{unit}", delta=delta, delta_color="off")
 
-        if st.form_submit_button("Save"):
-            log_entry(
-                weight_kg=weight or None,
-                calories=calories or None,
-                protein_g=protein or None,
-                workout=workout,
-                notes=notes,
-                entry_date=log_date.isoformat(),
-            )
-            st.success(f"Saved {log_date.isoformat()}")
-            st.rerun()
+        _metric("Calories", "calories")
+        _metric("Protein", "protein_g", "g")
+        _metric("Fat", "fat_g", "g")
+        _metric("Carbs", "carbs_g", "g")
+        if today.get("weight_kg"):
+            st.metric("Weight", f"{today['weight_kg']:.1f}kg")
+        if today.get("workout"):
+            st.caption(f"🏋️ {today['workout']}")
+        if today.get("notes"):
+            st.caption(f"📝 {today['notes']}")
+    else:
+        st.caption("Nothing logged today yet — just tell the assistant what you ate or did.")
 
 
 def extract_text(content) -> str:

@@ -12,10 +12,17 @@ create table if not exists logs (
   weight_kg numeric,
   calories numeric,
   protein_g numeric,
+  fat_g numeric,
+  carbs_g numeric,
   workout text,
   notes text,
   created_at timestamptz not null default now()
 );
+
+-- Adds fat/carbs tracking to an already-existing logs table (safe to re-run;
+-- no-ops if the columns are already there).
+alter table logs add column if not exists fat_g numeric;
+alter table logs add column if not exists carbs_g numeric;
 
 -- Supabase enables RLS by default on new projects, which blocks all access
 -- until a policy exists. This app has no per-user auth -- the whole thing is

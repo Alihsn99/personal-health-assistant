@@ -16,3 +16,10 @@ create table if not exists logs (
   notes text,
   created_at timestamptz not null default now()
 );
+
+-- Supabase enables RLS by default on new projects, which blocks all access
+-- until a policy exists. This app has no per-user auth -- the whole thing is
+-- gated by the Streamlit APP_PASSWORD instead -- so disable RLS here rather
+-- than writing policies for a single-user app.
+alter table profile disable row level security;
+alter table logs disable row level security;
